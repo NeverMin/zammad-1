@@ -134,7 +134,7 @@ returns
     UserInfo.current_user_id = 1
     filters = {}
     Setting.where(area: 'Postmaster::PreFilter').order(:name).each do |setting|
-      filters[setting.name] = Kernel.const_get(Setting.get(setting.name))
+      filters[setting.name] = Setting.get(setting.name).constantize
     end
     filters.each do |key, backend|
       Rails.logger.debug { "run postmaster pre filter #{key}: #{backend}" }
@@ -238,6 +238,14 @@ returns
 
         # create ticket
         ticket.save!
+
+      end
+
+      # apply tags to ticket
+      if mail['x-zammad-ticket-tags'.to_sym].present?
+        mail['x-zammad-ticket-tags'.to_sym].each do |tag|
+          ticket.tag_add(tag)
+        end
       end
 
       # set attributes
@@ -309,6 +317,8 @@ returns
   def self.check_attributes_by_x_headers(header_name, value)
     class_name = nil
     attribute = nil
+    # skip check attributes if it is tags
+    return true if header_name == 'x-zammad-ticket-tags'
     if header_name =~ /^x-zammad-(.+?)-(followup-|)(.*)$/i
       class_name = $1
       attribute = $3
@@ -494,7 +504,7 @@ process unprocessable_mails (tmp/unprocessable_mail/*.eml) again
   def message_body_hash(mail)
     message = [mail.html_part, mail.text_part, mail].find { |m| m&.body.present? }
 
-    if message.mime_type.nil? || message.mime_type.match?(%r{^text/(plain|html)$})
+    if message.present? && (message.mime_type.nil? || message.mime_type.match?(%r{^text/(plain|html)$}))
       content_type = message.mime_type || 'text/plain'
       body = body_text(message, strict_html: content_type.eql?('text/html'))
     end

@@ -131,6 +131,7 @@ class EmailReply extends App.Controller
     selected = App.ClipBoard.getSelected('html')
     if selected
       selected = App.Utils.htmlCleanup(selected).html()
+      selected = App.Utils.htmlImage2DataUrl(selected)
     if !selected
       selected = App.ClipBoard.getSelected('text')
       if selected
@@ -156,6 +157,8 @@ class EmailReply extends App.Controller
 
     type = App.TicketArticleType.findByAttribute(name:'email')
 
+    articleNew.subtype = 'reply'
+
     App.Event.trigger('ui::ticket::setArticleType', {
       ticket: ticket
       type: type
@@ -173,6 +176,8 @@ class EmailReply extends App.Controller
     body = ''
     if article.content_type.match('html')
       body = App.Utils.textCleanup(article.body)
+      body = App.Utils.htmlImage2DataUrl(article.body)
+
     if article.content_type.match('plain')
       body = App.Utils.textCleanup(article.body)
       body = App.Utils.text2html(body)
@@ -184,11 +189,13 @@ class EmailReply extends App.Controller
 
     if ui.Config.get('ui_ticket_zoom_article_email_subject')
       if _.isEmpty(article.subject)
-        articleNew.subject = "FW: #{ticket.title}"
+        articleNew.subject = ticket.title
       else
-        articleNew.subject = "FW: #{article.subject}"
+        articleNew.subject = article.subject
 
     type = App.TicketArticleType.findByAttribute(name:'email')
+
+    articleNew.subtype = 'forward'
 
     App.Event.trigger('ui::ticket::setArticleType', {
       ticket: ticket

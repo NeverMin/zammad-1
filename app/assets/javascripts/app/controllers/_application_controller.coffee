@@ -138,6 +138,12 @@ class App.Controller extends Spine.Controller
       App.Event.trigger('menu:render')
     @delay(delay, 150)
 
+  closeTab: (key = @taskKey, dest) =>
+    return if !key?
+    App.TaskManager.remove(key)
+    dest ?= App.TaskManager.nextTaskUrl() || '#'
+    @navigate dest
+
   scrollTo: (x = 0, y = 0, delay = 0) ->
     a = ->
       window.scrollTo(x, y)
@@ -663,6 +669,7 @@ class App.ControllerModal extends App.Controller
   large: false
   small: false
   head: '?'
+  autoFocusOnFirstInput: true
   container: null
   buttonClass: 'btn--success'
   centerButtons: []
@@ -812,7 +819,8 @@ class App.ControllerModal extends App.Controller
     @onShown(e)
 
   onShown: (e) =>
-    @$('input:not([disabled]):not([type="hidden"]):not(".btn"), textarea').first().focus()
+    if @autoFocusOnFirstInput
+      @$('input:not([disabled]):not([type="hidden"]):not(".btn"), textarea').first().focus()
     @initalFormParams = @formParams()
 
   localOnClose: (e) =>

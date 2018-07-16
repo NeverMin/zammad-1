@@ -25,7 +25,7 @@ class App.TicketZoom extends App.Controller
     if !params.init
       @overview_id = params.overview_id
     else
-      @overview_id = false
+      @overview_id = undefined
 
     @key = "ticket::#{@ticket_id}"
     cache = App.SessionStorage.get(@key)
@@ -109,7 +109,7 @@ class App.TicketZoom extends App.Controller
 
         # if ticket is already loaded, ignore status "0" - network issues e. g. temp. not connection
         if @ticketUpdatedAtLastCall && status is 0
-          console.log('network issues e. g. temp. not connection', status, statusText, detail)
+          console.log('network issues e. g. temp. no connection', status, statusText, detail)
           return
 
         # show error message
@@ -291,6 +291,7 @@ class App.TicketZoom extends App.Controller
 
   hide: =>
     @activeState = false
+    $('body > .modal').modal('hide')
     @positionPageHeaderStop()
     @autosaveStop()
     @shortcutNavigationstop()
@@ -421,7 +422,7 @@ class App.TicketZoom extends App.Controller
         object_id:   @ticket_id
         overview_id: @overview_id
         el:          elLocal.find('.js-ticketTitleContainer')
-        taskKey:    @taskKey
+        taskKey:     @taskKey
       )
 
       new App.TicketZoomMeta(
@@ -434,12 +435,12 @@ class App.TicketZoom extends App.Controller
         el:          elLocal.find('.js-attributeBar')
         overview_id: @overview_id
         callback:    @submit
-        taskKey:    @taskKey
+        taskKey:     @taskKey
       )
       #if @shown
       #  @attributeBar.start()
 
-      @form_id = App.ControllerForm.formId()
+      @form_id = @taskGet('article').form_id || App.ControllerForm.formId()
 
       @articleNew = new App.TicketZoomArticleNew(
         ticket:    @ticket
@@ -448,7 +449,7 @@ class App.TicketZoom extends App.Controller
         formMeta:  @formMeta
         form_id:   @form_id
         defaults:  @taskGet('article')
-        taskKey:  @taskKey
+        taskKey:   @taskKey
         ui:        @
       )
 
@@ -605,6 +606,7 @@ class App.TicketZoom extends App.Controller
         body:        ''
         internal:    internal
         in_reply_to: ''
+        subtype:     ''
 
     if @permissionCheck('ticket.customer')
       currentStore.article.internal = ''
@@ -633,6 +635,11 @@ class App.TicketZoom extends App.Controller
     # and the default is was not set before
     return if @isDefaultFollowUpStateSet
 
+    # and only if ticket is not in "new" state
+    if @ticket && @ticket.state_id
+      state = App.TicketState.findByAttribute('id', @ticket.state_id)
+      return if state && state.default_create is true
+
     # prevent multiple changes for the default follow up state
     @isDefaultFollowUpStateSet = true
 
@@ -660,7 +667,6 @@ class App.TicketZoom extends App.Controller
     else
       delete currentParams.article.attachments
 
-    # remove not needed attributes
     delete currentParams.article.form_id
 
     if @permissionCheck('ticket.customer')
@@ -960,6 +966,10 @@ class App.TicketZoom extends App.Controller
   taskGet: (area) =>
     return {} if !App.TaskManager.get(@taskKey)
     @localTaskData = App.TaskManager.get(@taskKey).state || {}
+
+    if _.isObject(@localTaskData.article) && _.isArray(App.TaskManager.get(@taskKey).attachments)
+      @localTaskData.article['attachments'] = App.TaskManager.get(@taskKey).attachments
+
     if area
       if !@localTaskData[area]
         @localTaskData[area] = {}
@@ -974,10 +984,15 @@ class App.TicketZoom extends App.Controller
 
   taskUpdateAll: (data) =>
     @localTaskData = data
+    @localTaskData.article['form_id'] = @form_id
     App.TaskManager.update(@taskKey, { 'state': @localTaskData })
 
   # reset task state
   taskReset: =>
+    @form_id = App.ControllerForm.formId()
+    @articleNew.form_id = @form_id
+    @articleNew.render()
+
     @localTaskData =
       ticket:  {}
       article: {}

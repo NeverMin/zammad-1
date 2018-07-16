@@ -5,6 +5,11 @@ class App.i18n
   @init: (args) ->
     _instance ?= new _i18nSingleton(args)
 
+  @translateDeep: (input, args...) ->
+    if _instance == undefined
+      _instance ?= new _i18nSingleton()
+    _instance.translateDeep(input, args)
+
   @translateContent: (string, args...) ->
     if _instance == undefined
       _instance ?= new _i18nSingleton()
@@ -203,11 +208,24 @@ class _i18nSingleton extends Spine.Module
     return string if !string
     @translate(string, args, true)
 
+  translateDeep: (input, args) =>
+    if _.isArray(input)
+      _.map input, (item) =>
+        @translateDeep(item, args)
+    else if _.isObject(input)
+      _.reduce _.keys(input), (memo, item) =>
+        memo[item] = @translateDeep(input[item])
+        memo
+      , {}
+    else
+      @translateInline(input, args)
+
+
   translateContent: (string, args) =>
     return string if !string
 
     if App.Config.get('translation_inline')
-      return '<span class="translation" onclick="arguments[0].stopPropagation(); return false" contenteditable="true" title="' + App.Utils.htmlEscape(string) + '">' + App.Utils.htmlEscape(@translate(string)) + '</span>'
+      return '<span class="translation" onkeydown="arguments[0].stopPropagation(); return true" onclick="arguments[0].stopPropagation(); return false" contenteditable="true" title="' + App.Utils.htmlEscape(string) + '">' + App.Utils.htmlEscape(@translate(string)) + '</span>'
 
     translated = @translate(string, args, true, true)
 
